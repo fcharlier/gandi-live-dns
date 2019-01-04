@@ -14,7 +14,7 @@ You want your homeserver to be always available at `dynamic_subdomain.mydomain.t
 
 ### Debian Package Requirements
 
-`apt-get update && apt-get upgrade && apt-get install unzip python-requests python-args python-simplejson`
+`apt-get update && apt-get upgrade && apt-get install unzip python-requests python-args`
 
 #### API Key
 First, you must apply for an API key with Gandi. Visit 

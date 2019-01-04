@@ -62,7 +62,7 @@ def get_dnsip(uuid):
     else:
         print 'Error: HTTP Status Code ', u.status_code, 'when trying to get IP from subdomain', config.subdomains[0]
         try:
-            print  json_object['message']
+            print u.json()['message']
         except ValueError:
             pass
         exit()
