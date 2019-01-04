@@ -8,46 +8,48 @@ License GPLv3
 https://www.gnu.org/licenses/gpl-3.0.html
 
 Created on 13 Aug 2017
-http://doc.livedns.gandi.net/ 
+http://doc.livedns.gandi.net/
 http://doc.livedns.gandi.net/#api-endpoint -> https://dns.gandi.net/api/v5/
 '''
 
-import requests, json
+import requests
 import config
 import argparse
 
 
 def get_dynip(ifconfig_provider):
     ''' find out own IPv4 at home <-- this is the dynamic IP which changes more or less frequently
-    similar to curl ifconfig.me/ip, see example.config.py for details to ifconfig providers 
-    ''' 
+    similar to curl ifconfig.me/ip, see example.config.py for details to ifconfig providers
+    '''
     r = requests.get(ifconfig_provider)
     #print 'Checking dynamic IP: ' , r._content.strip('\n')
     return r.content.strip('\n')
 
 def get_uuid():
-    ''' 
+    '''
     find out ZONE UUID from domain
     Info on domain "DOMAIN"
     GET /domains/<DOMAIN>:
-        
+
     '''
     url = config.api_endpoint + '/domains/' + config.domain
     u = requests.get(url, headers={"X-Api-Key":config.api_secret})
-    json_object = json.loads(u._content)
     if u.status_code == 200:
-        return json_object['zone_uuid']
+        return u.json()['zone_uuid']
     else:
         print 'Error: HTTP Status Code ', u.status_code, 'when trying to get Zone UUID'
-        print  json_object['message']
+        try:
+            print  u.json()['message']
+        except ValueError:
+            pass
         exit()
 
 def get_dnsip(uuid):
     ''' find out IP from first Subdomain DNS-Record
     List all records with name "NAME" and type "TYPE" in the zone UUID
     GET /zones/<UUID>/records/<NAME>/<TYPE>:
-    
-    The first subdomain from config.subdomain will be used to get   
+
+    The first subdomain from config.subdomain will be used to get
     the actual DNS Record IP
     '''
 
@@ -55,16 +57,18 @@ def get_dnsip(uuid):
     headers = {"X-Api-Key":config.api_secret}
     u = requests.get(url, headers=headers)
     if u.status_code == 200:
-        json_object = json.loads(u._content)
         #print 'Checking IP from DNS Record' , config.subdomains[0], ':', json_object['rrset_values'][0].encode('ascii','ignore').strip('\n')
-        return json_object['rrset_values'][0].encode('ascii','ignore').strip('\n')
+        return u.json()['rrset_values'][0].encode('ascii','ignore').strip('\n')
     else:
-        print 'Error: HTTP Status Code ', u.status_code, 'when trying to get IP from subdomain', config.subdomains[0]   
-        print  json_object['message']
+        print 'Error: HTTP Status Code ', u.status_code, 'when trying to get IP from subdomain', config.subdomains[0]
+        try:
+            print  json_object['message']
+        except ValueError:
+            pass
         exit()
 
 def update_records(uuid, dynIP, subdomain):
-    ''' update DNS Records for Subdomains 
+    ''' update DNS Records for Subdomains
         Change the "NAME"/"TYPE" record from the zone UUID
         PUT /zones/<UUID>/records/<NAME>/<TYPE>:
         curl -X PUT -H "Content-Type: application/json" \
@@ -76,15 +80,17 @@ def update_records(uuid, dynIP, subdomain):
     url = config.api_endpoint+ '/zones/' + uuid + '/records/' + subdomain + '/A'
     payload = {"rrset_ttl": config.ttl, "rrset_values": [dynIP]}
     headers = {"Content-Type": "application/json", "X-Api-Key":config.api_secret}
-    u = requests.put(url, data=json.dumps(payload), headers=headers)
-    json_object = json.loads(u._content)
+    u = requests.put(url, json=payload, headers=headers)
 
     if u.status_code == 201:
-        print 'Status Code:', u.status_code, ',', json_object['message'], ', IP updated for', subdomain
+        print 'Status Code:', u.status_code, ',', u.json()['message'], ', IP updated for', subdomain
         return True
     else:
-        print 'Error: HTTP Status Code ', u.status_code, 'when trying to update IP from subdomain', subdomain   
-        print  json_object['message']
+        print 'Error: HTTP Status Code ', u.status_code, 'when trying to update IP from subdomain', subdomain
+        try:
+            print u.json()['message']
+        except ValueError:
+            pass
         exit()
 
 
@@ -120,12 +126,12 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--verbose', help="increase output verbosity", action="store_true")
     parser.add_argument('-f', '--force', help="force an update/create", action="store_true")
     args = parser.parse_args()
-        
-        
+
+
     main(args.force, args.verbose)
 
 
 
 
 
-    
+
