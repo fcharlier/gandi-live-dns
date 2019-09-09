@@ -4,24 +4,38 @@
 Gandi v5 LiveDNS - DynDNS Update via REST API and CURL/requests
 
 @author: cave
+@author: François Charlier <fcharlier@ploup.net>
 License GPLv3
 https://www.gnu.org/licenses/gpl-3.0.html
 
 Created on 13 Aug 2017
+Last update on 9 Sep 2019
 http://doc.livedns.gandi.net/
 http://doc.livedns.gandi.net/#api-endpoint -> https://dns.gandi.net/api/v5/
 '''
 
-import requests
-import config
 import argparse
+import config
+import requests
+import urllib3
+
+
+session = requests.Session()
+retry = urllib3.util.Retry(
+        total=5, connect=5, read=5, status=5,
+        status_forcelist=(403, 500, 502, 503),
+        backoff_factor=1)
+retry_adapter = requests.adapters.HTTPAdapter(max_retries=retry)
+session.mount('https://', retry_adapter)
+session.mount('http://', retry_adapter)
+
 
 
 def get_dynip(ifconfig_provider):
     ''' find out own IPv4 at home <-- this is the dynamic IP which changes more or less frequently
     similar to curl ifconfig.me/ip, see example.config.py for details to ifconfig providers
     '''
-    r = requests.get(ifconfig_provider)
+    r = session.get(ifconfig_provider)
     #print 'Checking dynamic IP: ' , r._content.strip('\n')
     return r.content.strip('\n')
 
@@ -33,7 +47,7 @@ def get_uuid():
 
     '''
     url = config.api_endpoint + '/domains/' + config.domain
-    u = requests.get(url, headers={"X-Api-Key":config.api_secret})
+    u = session.get(url, headers={"X-Api-Key":config.api_secret})
     if u.status_code == 200:
         return u.json()['zone_uuid']
     else:
@@ -55,7 +69,7 @@ def get_dnsip(uuid):
 
     url = config.api_endpoint+ '/zones/' + uuid + '/records/' + config.subdomains[0] + '/A'
     headers = {"X-Api-Key":config.api_secret}
-    u = requests.get(url, headers=headers)
+    u = session.get(url, headers=headers)
     if u.status_code == 200:
         #print 'Checking IP from DNS Record' , config.subdomains[0], ':', json_object['rrset_values'][0].encode('ascii','ignore').strip('\n')
         return u.json()['rrset_values'][0].encode('ascii','ignore').strip('\n')
@@ -80,7 +94,7 @@ def update_records(uuid, dynIP, subdomain):
     url = config.api_endpoint+ '/zones/' + uuid + '/records/' + subdomain + '/A'
     payload = {"rrset_ttl": config.ttl, "rrset_values": [dynIP]}
     headers = {"Content-Type": "application/json", "X-Api-Key":config.api_secret}
-    u = requests.put(url, json=payload, headers=headers)
+    u = session.put(url, json=payload, headers=headers)
 
     if u.status_code == 201:
         print 'Status Code:', u.status_code, ',', u.json()['message'], ', IP updated for', subdomain
@@ -129,9 +143,3 @@ if __name__ == "__main__":
 
 
     main(args.force, args.verbose)
-
-
-
-
-
-
